@@ -48,7 +48,6 @@ services:
       - ./storage/extracted:/app/storage/extracted  # Shared storage for metadata
     networks:
       - marp-network
-    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 30s
@@ -179,7 +178,7 @@ services:
     container_name: marp-chat
     environment:
       RETRIEVAL_URL: http://retrieval:8002
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_API_KEY: ***REMOVED***
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: guest
