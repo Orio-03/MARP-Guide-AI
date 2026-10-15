@@ -1,6 +1,6 @@
 # MARP-Guide-AI
 
-![CI Pipeline](https://github.com/Th30utcast/MARP-Guide-AI/actions/workflows/ci.yml/badge.svg)
+![CI Pipeline](https://github.com/Orio-03/MARP-Guide-AI/actions/workflows/ci.yml/badge.svg)
 
 A Retrieval-Augmented Generation (RAG) chatbot that answers questions about Lancaster University's Manual of Academic Regulations and Procedures (MARP).
 
@@ -216,7 +216,7 @@ For detailed architecture diagrams and service documentation, see:
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/Th30utcast/MARP-Guide-AI.git
+   git clone https://github.com/Orio-03/MARP-Guide-AI.git
    cd MARP-Guide-AI
    ```
 
@@ -887,7 +887,7 @@ docker compose logs ingestion
 
 ## Contributors
 
-- Development Team: [Contributors](https://github.com/Th30utcast/MARP-Guide-AI/graphs/contributors)
+- Development Team: [Contributors](https://github.com/Orio-03/MARP-Guide-AI/graphs/contributors)
 
 ---
 
@@ -897,4 +897,4 @@ This project is developed as part of Lancaster University's coursework.
 
 ---
 
-**Questions or Issues?** Open an issue on [GitHub](https://github.com/Th30utcast/MARP-Guide-AI/issues)
+**Questions or Issues?** Open an issue on [GitHub](https://github.com/Orio-03/MARP-Guide-AI/issues)
