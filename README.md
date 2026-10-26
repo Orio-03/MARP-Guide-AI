@@ -13,9 +13,9 @@
   ·
   <a href="#evaluation-three-llms-17-questions">Evaluation</a>
   ·
-  <a href="#quick-start">Run it</a>
+  <a href="#run-it-yourself">Run it</a>
   ·
-  <a href="#architecture">Architecture</a>
+  <a href="#for-developers">For developers</a>
 </p>
 
 <p align="center">
@@ -69,55 +69,17 @@ PDFs ─► Ingestion ─► Extraction ─► Indexing ────────
 Question ─► Chat service ─► Retrieval (top-k chunks) ─► LLM via OpenRouter ─► answer + citations
 ```
 
-- **Every step is its own service.** They talk through RabbitMQ events (`DocumentDiscovered` → `DocumentExtracted` → `ChunksIndexed`), so a slow or failed step doesn't block the others.
+- **Every step is its own service.** They talk through RabbitMQ events, so a slow or failed step doesn't block the others.
 - **Embeddings:** `all-MiniLM-L6-v2` (384 dimensions, cosine similarity), stored in Qdrant.
-- **Answers are grounded:** the model only sees the retrieved chunks and must cite them, and each citation carries the chunk's title, page and source link.
-- **Analytics are events too:** queries, responses, feedback, citation clicks and model choices are published to RabbitMQ and aggregated by the analytics service.
-- **Around it:** a React UI, an auth service (PostgreSQL + Redis sessions), Docker Compose for everything, and a CI pipeline with lint, unit, integration and Docker build checks.
-
-The full diagrams and event flow are in [Architecture](#architecture).
-
-<a id="evaluation-three-llms-17-questions"></a>
-## Evaluation: three LLMs, 17 questions
-
-We wrote a [17-question test catalogue](docs/test-catalogue.md) covering basic knowledge, specific regulations, citation checks and edge cases: vague and ambiguous questions, typos, and out-of-scope questions that must be declined rather than answered. Each model was scored on accuracy, citation quality and hallucinations.
-
-| Model | Passed | Quality | Cost |
-| --- | --- | --- | --- |
-| DeepSeek Chat | 17 / 17 | 9.5 / 10 | Free |
-| GPT-4o Mini | 17 / 17 | 9.8 / 10 | Paid |
-| Gemma 3n 2B | 14 / 17 | 7.5 / 10 | Free |
-
-All three declined every out-of-scope question, with no hallucinated answers. The small Gemma model struggled most with ambiguous questions, which showed us where a cheaper model stops being good enough. Details: [model comparison](docs/model-comparison-summary.md).
-
-## Team
-
-Built by a team of four as Lancaster University Software Engineering coursework (2025). See the [contributors](https://github.com/Orio-03/MARP-Guide-AI/graphs/contributors).
-
----
+- **Grounded answers:** the model only sees the retrieved chunks and must cite every fact, and each citation carries its title, page and link.
+- **Around it:** a React UI, an auth service (PostgreSQL + Redis sessions), an analytics service fed by events, Docker Compose for everything, and CI with lint, unit, integration and Docker build checks.
 
 <details>
-<summary><b>Technical documentation</b> (everything below)</summary>
-
-- [Architecture](#architecture)
-- [Quick Start](#quick-start): [Prerequisites](#prerequisites), [Setup](#setup), [Running the System](#running-the-system)
-- [Service Access Details](#service-access-details)
-- [Data Storage](#data-storage)
-- [Development](#development): [Project Structure](#project-structure), [Code Quality Tools](#code-quality-tools)
-- [Testing](#testing): [Running Tests Locally](#running-tests-locally), [CI/CD Pipeline](#cicd-pipeline)
-- [Docker Build Optimization](#docker-build-optimization)
-- [Troubleshooting](#troubleshooting)
-- [Technology Stack](#technology-stack)
-
-</details>
-
----
-
-## Architecture
+<summary><b>Full architecture: diagram, components and event flow</b></summary>
 
 This system uses a **microservices architecture** with **event-driven communication** via RabbitMQ.
 
-### High-Level Architecture Overview
+##### High-Level Architecture Overview
 
 ```mermaid
 graph TB
@@ -207,7 +169,7 @@ graph TB
 - **Blue** - External Systems
 - **Red** - End Users
 
-### Components
+##### Components
 
 **Data Processing Pipeline:**
 1. **Ingestion Service** - Discovers and downloads MARP PDFs from Lancaster's website
@@ -227,7 +189,7 @@ graph TB
 11. **PostgreSQL** - User data storage (credentials, profiles)
 12. **Redis** - Session token storage and caching
 
-### Event Flow Pipeline
+##### Event Flow Pipeline
 
 **Data Processing:**
 ```
@@ -250,17 +212,37 @@ For detailed architecture diagrams and service documentation, see:
 - [Web UI Pipeline](docs/services/UI/UI_pipeline.md) - Frontend interaction flows
 - [Event Catalogue](docs/events/event-catalogue.md) - All system events
 
----
+</details>
 
-## Quick Start
+<a id="evaluation-three-llms-17-questions"></a>
+## Evaluation: three LLMs, 17 questions
 
-### Prerequisites
+We wrote a [17-question test catalogue](docs/test-catalogue.md) covering basic knowledge, specific regulations, citation checks and edge cases: vague and ambiguous questions, typos, and out-of-scope questions that must be declined rather than answered. Each model was scored on accuracy, citation quality and hallucinations.
 
-- Docker and Docker Compose installed
-- At least 4GB of RAM available for containers
-- OpenRouter API key (free tier available)
+| Model | Passed | Quality | Cost |
+| --- | --- | --- | --- |
+| DeepSeek Chat | 17 / 17 | 9.5 / 10 | Free |
+| GPT-4o Mini | 17 / 17 | 9.8 / 10 | Paid |
+| Gemma 3n 2B | 14 / 17 | 7.5 / 10 | Free |
 
-### Setup
+All three declined every out-of-scope question, with no hallucinated answers. The small Gemma model struggled most with ambiguous questions, which showed us where a cheaper model stops being good enough. Details: [model comparison](docs/model-comparison-summary.md).
+
+<a id="run-it-yourself"></a>
+## Run it yourself
+
+You need **Docker** (with Compose), about **4 GB of RAM** for the containers, and a free [OpenRouter](https://openrouter.ai) API key.
+
+```bash
+git clone https://github.com/Orio-03/MARP-Guide-AI.git
+cd MARP-Guide-AI
+cp .env.example .env        # then put your OpenRouter key in .env
+docker compose up --build
+```
+
+Open **<http://localhost:8080>**, register an account and ask a question. Your second question shows the three-model comparison. An admin account (`admin@example.com` / `admin`) is created on startup and sees analytics for all users.
+
+<details>
+<summary><b>Setup details: API key, faster builds, logs and health checks</b></summary>
 
 1. **Get an OpenRouter API Key**:
 
@@ -270,15 +252,19 @@ For detailed architecture diagrams and service documentation, see:
 
 2. **Configure environment variables**:
 
-   Your `.env` file should look like:
+   Copy the example file and put your key in it:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   `.env` should then contain:
 
    ```bash
    OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxx
    ```
 
    **Note:** If you experience authentication issues, ensure `OPENROUTER_API_KEY` is not exported in your terminal environment (run `unset OPENROUTER_API_KEY` or use a fresh terminal).
-
-### Running the System
 
 1. **Clone the repository**:
 
@@ -327,9 +313,12 @@ For detailed architecture diagrams and service documentation, see:
    - RabbitMQ Management UI: <http://localhost:15672> (guest/guest)
    - Qdrant Dashboard: <http://localhost:6333/dashboard>
 
-### Using the Application
+</details>
 
-#### Web UI (Recommended)
+<details>
+<summary><b>Using the app and the API directly (curl, Swagger docs)</b></summary>
+
+#### Web UI
 
 The **easiest way** to use the system:
 
@@ -346,7 +335,7 @@ The **easiest way** to use the system:
    - Admin users see global analytics across all users
    - **Admin Login**: `admin@example.com` / `admin` (created automatically on startup)
 
-#### API Testing (For Developers)
+#### API
 
 **Authentication Required**: The Chat API now requires a Bearer token.
 
@@ -386,7 +375,7 @@ curl -X POST http://localhost:8003/chat/compare \
   -d '{"query": "What happens if I am ill during exams?", "top_k": 5}'
 ```
 
-#### Interactive API Documentation
+#### Interactive API documentation
 
 1. **Chat API**: <http://localhost:8003/docs>
 2. **Auth API**: <http://localhost:8004/docs>
@@ -395,23 +384,12 @@ curl -X POST http://localhost:8003/chat/compare \
 
 Note: Use the "Authorize" button in Swagger UI to add your Bearer token.
 
-### Stopping the System
+</details>
 
-```bash
-docker compose down
-```
+<details>
+<summary><b>Service URLs, ports and admin UIs</b></summary>
 
-To also remove volumes (PDFs and vector data):
-
-```bash
-docker compose down -v
-```
-
----
-
-## Service Access Details
-
-### Web UI (Primary Interface)
+#### Web UI (Primary Interface)
 
 - **URL**: <http://localhost:8080>
 - **Features**:
@@ -421,7 +399,7 @@ docker compose down -v
   - Analytics dashboard
   - Lancaster University branding
 
-### Authentication Service
+#### Authentication Service
 
 - **URL**: <http://localhost:8004>
 - **Interactive Docs**: <http://localhost:8004/docs>
@@ -438,7 +416,7 @@ docker compose down -v
   - `GET /auth/preferences/model` - Get user's preferred LLM model
   - `POST /auth/preferences/model` - Set user's preferred LLM model
 
-### Chat Service API
+#### Chat Service API
 
 - **URL**: <http://localhost:8003>
 - **Interactive Docs**: <http://localhost:8003/docs>
@@ -448,7 +426,7 @@ docker compose down -v
   - `POST /chat/compare` - Multi-model comparison (3 models)
   - `POST /chat/comparison/select` - Record user's model preference
 
-### Analytics Service
+#### Analytics Service
 
 - **URL**: <http://localhost:8005>
 - **Interactive Docs**: <http://localhost:8005/docs>
@@ -467,7 +445,7 @@ docker compose down -v
   - `GET /analytics/recent-queries` - Recent queries with timestamps
   - `POST /analytics/reset` - Reset all analytics data (admin only, testing purposes)
 
-### Retrieval Service API
+#### Retrieval Service API
 
 - **URL**: <http://localhost:8002>
 - **Interactive Docs**: <http://localhost:8002/docs>
@@ -475,30 +453,30 @@ docker compose down -v
   - `GET /health` - Health check
   - `POST /search` - Semantic search endpoint (no auth required)
 
-### Ingestion Service
+#### Ingestion Service
 
 - **URL**: <http://localhost:8001>
 - **Type**: Worker service (runs once at startup, not a REST API)
 - **Endpoints**:
   - `GET /health` - Health check (RabbitMQ connection status)
 
-### Infrastructure UIs
+#### Infrastructure UIs
 
-#### RabbitMQ Management
+##### RabbitMQ Management
 
 - **URL**: <http://localhost:15672>
 - **Username**: `guest`
 - **Password**: `guest`
 - **Key queues**: `documents.discovered`, `documents.extracted`, `documents.indexed`, `analytics.*`
 
-#### Qdrant Vector Database
+##### Qdrant Vector Database
 
 - **HTTP API**: <http://localhost:6333>
 - **Dashboard**: <http://localhost:6333/dashboard>
 - **Collection**: `marp-documents` (384 dimensions, cosine similarity)
 - **Embedding Model**: `all-MiniLM-L6-v2`
 
-#### PostgreSQL Database
+##### PostgreSQL Database
 
 - **Host**: `localhost:5432`
 - **Database**: `marp_db`
@@ -507,16 +485,17 @@ docker compose down -v
   - `users` - User accounts with bcrypt password hashing
   - `user_preferences` - User's preferred LLM model settings
 
-#### Redis Cache
+##### Redis Cache
 
 - **Host**: `localhost:6379`
 - **Purpose**: Session token storage (24h TTL)
 
----
+</details>
 
-## Data Storage
+<details>
+<summary><b>Where the data is stored</b></summary>
 
-### PDFs Directory
+#### PDFs Directory
 
 Downloaded PDFs are stored in:
 
@@ -528,7 +507,7 @@ pdfs/
   ...
 ```
 
-### Extracted Data
+#### Extracted Data
 
 All events and extracted data are stored in:
 
@@ -541,11 +520,28 @@ storage/extracted/{documentId}/
   indexed.json       # ChunksIndexed event
 ```
 
----
+</details>
 
-## Development
+<details>
+<summary><b>Stopping and resetting</b></summary>
 
-### Project Structure
+```bash
+docker compose down
+```
+
+To also remove volumes (PDFs and vector data):
+
+```bash
+docker compose down -v
+```
+
+</details>
+
+<a id="for-developers"></a>
+## For developers
+
+<details>
+<summary><b>Project structure</b></summary>
 
 ```
 MARP-Guide-AI/
@@ -621,7 +617,10 @@ MARP-Guide-AI/
 └── docker-compose.yml          # Service orchestration
 ```
 
-### Code Quality Tools
+</details>
+
+<details>
+<summary><b>Code quality tools (black, isort, flake8, pre-commit)</b></summary>
 
 Configuration is centralized in `pyproject.toml`:
 
@@ -646,11 +645,10 @@ flake8 services/ common/ tests/
 - **pytest**: Test framework with coverage
 - **coverage**: Code coverage tracking
 
----
+</details>
 
-## Testing
-
-### Running Tests Locally
+<details>
+<summary><b>Running the tests</b></summary>
 
 **Install test dependencies:**
 
@@ -703,7 +701,10 @@ See [tests/README.md](tests/README.md) for comprehensive testing documentation i
 - CI/CD integration
 - Troubleshooting guide
 
-### CI/CD Pipeline
+</details>
+
+<details>
+<summary><b>CI/CD pipeline</b></summary>
 
 The project uses **GitHub Actions** for automated testing. The CI pipeline runs on every push and pull request.
 
@@ -763,13 +764,14 @@ Coverage Report (summary)
 
 This follows the **fail-fast** principle: linting errors stop the pipeline immediately, saving time and resources.
 
----
+</details>
 
-## Docker Build Optimization
+<details>
+<summary><b>Faster Docker builds (BuildKit)</b></summary>
 
 All Dockerfiles have been optimized with **BuildKit cache mounts** for significantly faster builds.
 
-### Enable BuildKit
+#### Enable BuildKit
 
 **Windows (PowerShell):**
 
@@ -793,7 +795,7 @@ docker compose up --build
 3. Add: `DOCKER_BUILDKIT` = `1`
 4. Add: `COMPOSE_DOCKER_CLI_BUILD` = `1`
 
-### Performance Improvements
+#### Performance Improvements
 
 | Build Type            | Before    | After       | Improvement              |
 | --------------------- | --------- | ----------- | ------------------------ |
@@ -801,7 +803,7 @@ docker compose up --build
 | Rebuild (code change) | 10-15 min | **3-5 min** | **3-5x faster**          |
 | Rebuild (no changes)  | 8-10 min  | **30 sec**  | **16-20x faster**        |
 
-### How It Works
+#### How It Works
 
 All Dockerfiles now use:
 
@@ -812,11 +814,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 This caches pip downloads between builds without increasing the final image size.
 
----
+</details>
 
-## Troubleshooting
+<details>
+<summary><b>Troubleshooting</b></summary>
 
-### Docker won't start
+#### Docker won't start
 
 ```bash
 docker compose logs rabbitmq
@@ -824,55 +827,56 @@ docker compose logs qdrant
 docker compose logs ingestion
 ```
 
-### RabbitMQ connection failed
+#### RabbitMQ connection failed
 
 1. Check status: `docker compose ps rabbitmq`
 2. View logs: `docker compose logs rabbitmq | grep "started"`
 3. Restart: `docker compose restart rabbitmq`
 
-### Qdrant connection failed
+#### Qdrant connection failed
 
 1. Check status: `docker compose ps qdrant`
 2. Test API: `curl http://localhost:6333/collections`
 3. Restart: `docker compose restart qdrant`
 
-### No PDFs being downloaded
+#### No PDFs being downloaded
 
 1. Check logs: `docker compose logs ingestion`
 2. Check stats: Visit <http://localhost:8001/stats>
 3. Manually trigger: Visit <http://localhost:8001/docs> → `POST /ingest`
 
-### Events not flowing through pipeline
+#### Events not flowing through pipeline
 
 1. Check RabbitMQ queues: <http://localhost:15672> (guest/guest)
 2. Verify service health: <http://localhost:8001/health>
 3. Check worker logs: `docker compose logs extraction indexing`
 
-### Authentication errors
+#### Authentication errors
 
 1. Ensure session token is valid (24h expiry)
 2. Check Redis connection: `docker compose ps redis`
 3. Re-login to get fresh token: `POST /login`
 4. View auth logs: `docker compose logs auth`
 
-### UI not loading
+#### UI not loading
 
 1. Check UI service: `docker compose ps ui`
 2. View logs: `docker compose logs ui`
 3. Verify port 8080 is not in use: `lsof -i :8080` (Mac/Linux)
 4. Clear browser cache and retry
 
-### Tests failing locally
+#### Tests failing locally
 
 1. Ensure dependencies installed: `pip install -r requirements-test.txt`
 2. Run from project root: `cd MARP-Guide-AI && pytest`
 3. For integration tests: `docker compose up -d rabbitmq qdrant`
 
----
+</details>
 
-## Technology Stack
+<details>
+<summary><b>Technology stack</b></summary>
 
-### Core Infrastructure
+#### Core Infrastructure
 
 | Technology     | Version         | Purpose                       |
 | -------------- | --------------- | ----------------------------- |
@@ -883,7 +887,7 @@ docker compose logs ingestion
 | PostgreSQL     | 15-alpine       | User data storage             |
 | Redis          | 7-alpine        | Session token storage         |
 
-### Python Services
+#### Python Services
 
 | Technology      | Version | Purpose                     |
 | --------------- | ------- | --------------------------- |
@@ -897,7 +901,7 @@ docker compose logs ingestion
 | redis           | Latest  | Redis client                |
 | bcrypt          | Latest  | Password hashing            |
 
-### Data Processing
+#### Data Processing
 
 | Technology            | Version | Purpose              |
 | --------------------- | ------- | -------------------- |
@@ -911,7 +915,7 @@ docker compose logs ingestion
 | numpy                 | 1.24.3  | Numerical computing  |
 | openai                | Latest  | OpenAI SDK client    |
 
-### AI/ML Models
+#### AI/ML Models
 
 - **Embedding Model**: `all-MiniLM-L6-v2` (384 dimensions, cosine similarity)
 - **LLM Provider**: OpenRouter (free tier available)
@@ -919,7 +923,7 @@ docker compose logs ingestion
 - **Multi-Model Comparison**: 3 models compared in parallel (GPT-4o Mini, Gemma 3n, DeepSeek Chat)
 - **Max Context**: 3500 tokens for comprehensive answers
 
-### Frontend
+#### Frontend
 
 | Technology            | Version | Purpose                    |
 | --------------------- | ------- | -------------------------- |
@@ -935,7 +939,7 @@ docker compose logs ingestion
 | @vitejs/plugin-react  | 4.2.0   | Vite React plugin          |
 | Nginx                 | Alpine  | Production static server   |
 
-### Development Tools
+#### Development Tools
 
 | Tool           | Version | Purpose                   |
 | -------------- | ------- | ------------------------- |
@@ -950,18 +954,8 @@ docker compose logs ingestion
 | pre-commit     | Latest  | Git hooks for formatting  |
 | GitHub Actions | N/A     | CI/CD pipeline            |
 
----
+</details>
 
-## Contributors
+## Team
 
-- Development Team: [Contributors](https://github.com/Orio-03/MARP-Guide-AI/graphs/contributors)
-
----
-
-## License
-
-This project is developed as part of Lancaster University's coursework.
-
----
-
-**Questions or Issues?** Open an issue on [GitHub](https://github.com/Orio-03/MARP-Guide-AI/issues)
+Built by a team of four as Lancaster University Software Engineering coursework (2025). See the [contributors](https://github.com/Orio-03/MARP-Guide-AI/graphs/contributors). Questions or issues? Open an [issue](https://github.com/Orio-03/MARP-Guide-AI/issues).
