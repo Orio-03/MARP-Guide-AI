@@ -1,48 +1,115 @@
-# MARP-Guide-AI
+<h1 align="center">MARP Guide AI</h1>
 
-![CI Pipeline](https://github.com/Orio-03/MARP-Guide-AI/actions/workflows/ci.yml/badge.svg)
+<p align="center">
+  <b>Ask Lancaster University's academic regulations a question, and get an answer with the page it came from.</b><br>
+  A retrieval-augmented (RAG) assistant for the Manual of Academic Regulations and Procedures (MARP),<br>
+  built as event-driven Python microservices, with three LLMs you can compare side by side.
+</p>
 
-A Retrieval-Augmented Generation (RAG) chatbot that answers questions about Lancaster University's Manual of Academic Regulations and Procedures (MARP).
+<p align="center">
+  <a href="#see-it">See it</a>
+  ·
+  <a href="#how-it-works">How it works</a>
+  ·
+  <a href="#evaluation-three-llms-17-questions">Evaluation</a>
+  ·
+  <a href="#quick-start">Run it</a>
+  ·
+  <a href="#architecture">Architecture</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Orio-03/MARP-Guide-AI/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Orio-03/MARP-Guide-AI/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Python 3.11" src="https://img.shields.io/badge/Python-3.11-3776AB">
+  <img alt="React and Vite" src="https://img.shields.io/badge/UI-React%20%2B%20Vite-61DAFB">
+  <img alt="Qdrant" src="https://img.shields.io/badge/vectors-Qdrant-DC244C">
+  <img alt="RabbitMQ" src="https://img.shields.io/badge/events-RabbitMQ-FF6600">
+</p>
+
+![The chat: a question about illness during exams, answered from MARP with the page it comes from](docs/images/chat.webp)
+
+<sub>The screenshots show the real interface replaying answers recorded during our December 2025 test runs. The analytics figures are sample data.</sub>
+
+## What it does
+
+- **Answers from the source.** Questions are answered only from the MARP PDFs, found by semantic search over vector embeddings.
+- **Every answer cites its page.** Each answer lists the document, page number and link, so anyone can check it.
+- **Says when it doesn't know.** Questions outside MARP, like the weather in Lancaster, get a clear "not in MARP" instead of a made-up answer.
+- **Compare three LLMs.** On your second question, GPT-4o Mini, DeepSeek Chat and Gemma 3n answer side by side, and you pick the one you prefer.
+- **Analytics.** Admins see queries, response times, citations per answer, popular questions and per-model usage. Students see their own.
+- **Accounts.** Registration and sign-in, with server-side sessions.
+
+<a id="see-it"></a>
+## See it
+
+**Compare models.** The same question answered by three LLMs, each with its own sources. Your choice becomes your model for the rest of the chat.
+
+![Three models answer "What is MARP?" side by side, each with its sources](docs/images/compare.webp)
+
+<details>
+<summary><b>Analytics dashboard</b></summary>
+
+![Analytics: total queries, average response time, average citations, comparisons, recent and popular queries, and per-model performance](docs/images/analytics.webp)
+
+</details>
+
+<details>
+<summary><b>Sign in</b></summary>
+
+![The sign-in page](docs/images/login.webp)
+
+</details>
+
+## How it works
+
+```
+PDFs ─► Ingestion ─► Extraction ─► Indexing ─────────► Qdrant
+        (discover)   (text+pages)  (chunks, embeddings)   │
+                                                          ▼
+Question ─► Chat service ─► Retrieval (top-k chunks) ─► LLM via OpenRouter ─► answer + citations
+```
+
+- **Every step is its own service.** They talk through RabbitMQ events (`DocumentDiscovered` → `DocumentExtracted` → `ChunksIndexed`), so a slow or failed step doesn't block the others.
+- **Embeddings:** `all-MiniLM-L6-v2` (384 dimensions, cosine similarity), stored in Qdrant.
+- **Answers are grounded:** the model only sees the retrieved chunks and must cite them, and each citation carries the chunk's title, page and source link.
+- **Analytics are events too:** queries, responses, feedback, citation clicks and model choices are published to RabbitMQ and aggregated by the analytics service.
+- **Around it:** a React UI, an auth service (PostgreSQL + Redis sessions), Docker Compose for everything, and a CI pipeline with lint, unit, integration and Docker build checks.
+
+The full diagrams and event flow are in [Architecture](#architecture).
+
+<a id="evaluation-three-llms-17-questions"></a>
+## Evaluation: three LLMs, 17 questions
+
+We wrote a [17-question test catalogue](docs/test-catalogue.md) covering basic knowledge, specific regulations, citation checks and edge cases: vague and ambiguous questions, typos, and out-of-scope questions that must be declined rather than answered. Each model was scored on accuracy, citation quality and hallucinations.
+
+| Model | Passed | Quality | Cost |
+| --- | --- | --- | --- |
+| DeepSeek Chat | 17 / 17 | 9.5 / 10 | Free |
+| GPT-4o Mini | 17 / 17 | 9.8 / 10 | Paid |
+| Gemma 3n 2B | 14 / 17 | 7.5 / 10 | Free |
+
+All three declined every out-of-scope question, with no hallucinated answers. The small Gemma model struggled most with ambiguous questions, which showed us where a cheaper model stops being good enough. Details: [model comparison](docs/model-comparison-summary.md).
+
+## Team
+
+Built by a team of four as Lancaster University Software Engineering coursework (2025). See the [contributors](https://github.com/Orio-03/MARP-Guide-AI/graphs/contributors).
 
 ---
 
-## Table of Contents
+<details>
+<summary><b>Technical documentation</b> (everything below)</summary>
 
-- [Product Overview](#product-overview)
 - [Architecture](#architecture)
-- [Quick Start](#quick-start)
-  - [Prerequisites](#prerequisites)
-  - [Setup](#setup)
-  - [Running the System](#running-the-system)
-  - [Testing the Chat Service](#testing-the-chat-service)
+- [Quick Start](#quick-start): [Prerequisites](#prerequisites), [Setup](#setup), [Running the System](#running-the-system)
 - [Service Access Details](#service-access-details)
 - [Data Storage](#data-storage)
-- [Development](#development)
-  - [Project Structure](#project-structure)
-  - [Code Quality Tools](#code-quality-tools)
-- [Testing](#testing)
-  - [Running Tests Locally](#running-tests-locally)
-  - [CI/CD Pipeline](#cicd-pipeline)
+- [Development](#development): [Project Structure](#project-structure), [Code Quality Tools](#code-quality-tools)
+- [Testing](#testing): [Running Tests Locally](#running-tests-locally), [CI/CD Pipeline](#cicd-pipeline)
 - [Docker Build Optimization](#docker-build-optimization)
 - [Troubleshooting](#troubleshooting)
 - [Technology Stack](#technology-stack)
 
----
-
-## Product Overview
-
-**Target Audience**: Students and staff who need quick access to university regulations.
-
-**Value Proposition**: Reliable, quickly accessible information with proper source citations.
-
-**Key Features**:
-
-- **Semantic Search**: Answers derived from MARP PDF documents using vector embeddings
-- **Proper Citations**: Results include title, page number, and source link
-- **Multi-Model Comparison**: Compare answers from 3 different LLMs side-by-side
-- **User Authentication**: Secure registration and session management
-- **Usage Analytics**: Track queries, model preferences, and user interactions
-- **Interactive Web UI**: React-based interface with Lancaster University branding
+</details>
 
 ---
 
